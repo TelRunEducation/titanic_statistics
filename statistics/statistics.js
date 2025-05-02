@@ -11,31 +11,29 @@ async function getPassengersList() {
     const columnIndexedNames = new Map() // map that contains column index as a key and column name as value
     dataRows
       .shift()
-      .replace('\n', '')
-      .replace('\r', '')
-      .trim()
-      .split(scvRegex).map((fieldName, index) => {
-      if (fieldName.length > 1) {
-        columnIndexedNames.set(index, fieldName);
-      }
-    })
-
-    dataRows.pop() // last row is not valid
+      .split(scvRegex)
+      .map((fieldName, index) => {
+        if (fieldName.length > 1) {
+          columnIndexedNames.set(index, fieldName);
+        }
+      })
 
     dataRows.forEach((row) => {
-      const passenger = {}
-      row.split(scvRegex)
-        .forEach((data, index) => {
-          if (columnIndexedNames.has(index)) {
-            const fieldName = columnIndexedNames.get(index);
-            if (stringTypedFields.includes(fieldName)) {
-              passenger[fieldName] = data.replaceAll('"', '');
-            } else {
-              passenger[fieldName] = isNaN(+data) ? 0 : +data;
+      if (row.length > 10) {
+        const passenger = {}
+        row.split(scvRegex)
+          .forEach((data, index) => {
+            if (columnIndexedNames.has(index)) {
+              const fieldName = columnIndexedNames.get(index);
+              if (stringTypedFields.includes(fieldName)) {
+                passenger[fieldName] = data.replaceAll('"', '');
+              } else {
+                passenger[fieldName] = isNaN(+data) ? 0 : +data;
+              }
             }
-          }
-        })
-      passengersInfo.push(passenger);
+          })
+        passengersInfo.push(passenger);
+      }
     })
 
   } catch (err) {
@@ -52,7 +50,7 @@ const calculateTotalFares = (passengersInfo) => {
 
 const calculateAverageFareByClass = (pClass, passengersInfo) => {
   const filteredPassengers = passengersInfo.filter(passenger => passenger['Pclass'] === pClass)
-  return (calculateTotalFares(filteredPassengers)/filteredPassengers.length).toFixed(2)
+  return (calculateTotalFares(filteredPassengers) / filteredPassengers.length).toFixed(2)
 }
 
 const calculateBySurvival = (gotSurvived, passengersInfo) => {
@@ -61,13 +59,14 @@ const calculateBySurvival = (gotSurvived, passengersInfo) => {
 }
 
 const calculateMenBySurvival = (gotSurvived, passengersInfo) => {
-  const men = passengersInfo.filter(passenger => passenger['Sex'] === 'male' && passenger['Age'] >=18)
+  const men = passengersInfo
+    .filter(passenger => passenger['Sex'] === 'male' && (passenger['Age'] >= 18 || passenger['Age'] === 0))
   return calculateBySurvival(gotSurvived, men)
 }
 
 const calculateWomenBySurvival = (gotSurvived, passengersInfo) => {
   const women = passengersInfo
-    .filter(passenger => passenger['Sex'] === 'female' && (passenger['Age'] >=18 || passenger['Age'] === 0))
+    .filter(passenger => passenger['Sex'] === 'female' && (passenger['Age'] >= 18 || passenger['Age'] === 0))
   return calculateBySurvival(gotSurvived, women)
 }
 
