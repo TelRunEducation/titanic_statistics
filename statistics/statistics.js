@@ -1,47 +1,60 @@
-import fs from 'node:fs/promises';
+import fs from 'node:fs';
+import readline from "node:readline";
 
-async function getPassengersList() {
-  const passengersInfo = []
-  try {
-    const data = await fs.readFile('../stats_titanic.csv', 'utf8');
-    const stringTypedFields = ['Name', 'Sex', 'Cabin', 'Embarked', 'Ticket']
-    const scvRegex = /(".*?"|[^",\s]*)(?=\s*,|\s*$)/g;
+const scvRegex = /(".*?"|[^",\s]*)(?=\s*,|\s*$)/g;
+const stringTypedFields = ['Name', 'Sex', 'Cabin', 'Embarked', 'Ticket']
 
-    const dataRows = data.split('\n');
-    const columnIndexedNames = new Map() // map that contains column index as a key and column name as value
-    dataRows
-      .shift()
-      .split(scvRegex)
-      .map((fieldName, index) => {
-        if (fieldName.length > 1) {
-          columnIndexedNames.set(index, fieldName);
-        }
-      })
-
-    dataRows.forEach((row) => {
-      if (row.length > 10) {
-        const passenger = {}
-        row.split(scvRegex)
-          .forEach((data, index) => {
-            if (columnIndexedNames.has(index)) {
-              const fieldName = columnIndexedNames.get(index);
-              if (stringTypedFields.includes(fieldName)) {
-                passenger[fieldName] = data.replaceAll('"', '');
-              } else {
-                passenger[fieldName] = isNaN(+data) ? 0 : +data;
-              }
-            }
-          })
-        passengersInfo.push(passenger);
+const getPassengerFieldNames = (line, columnIndexedNames) => {
+  line
+    .split(scvRegex)
+    .map((fieldName, index) => {
+      if (fieldName.length > 1) {
+        columnIndexedNames.set(index, fieldName);
       }
     })
-
-  } catch (err) {
-    console.error(err);
-  }
-  return passengersInfo;
 }
 
+const getPassengerInfo = (line, columnIndexedNames) => {
+  const passenger = {}
+  line.split(scvRegex)
+    .forEach((data, index) => {
+      if (columnIndexedNames.has(index)) {
+        const fieldName = columnIndexedNames.get(index);
+        if (stringTypedFields.includes(fieldName)) {
+          passenger[fieldName] = data.replaceAll('"', '');
+        } else {
+          passenger[fieldName] = isNaN(+data) ? 0 : +data;
+        }
+      }
+    })
+  return passenger;
+}
+
+async function getPassengersList() {
+  const reader = readline.createInterface({
+      input: fs.createReadStream('../stats_titanic.csv', {encoding: 'utf8'}),
+      crlfDelay: Infinity
+    }
+  )
+  const columnIndexedNames = new Map() // map of field name and corresponding index of the column in the file as key
+  const passengersInfo = [] // array that contains all passengers info
+
+  return new Promise((resolve, reject) => {
+
+    reader.on('line', (line) => {
+      if (line.length < 2) return;
+      !columnIndexedNames.size ?
+        getPassengerFieldNames(line, columnIndexedNames) // this is the first line, and we get field names from here
+        : passengersInfo.push(getPassengerInfo(line, columnIndexedNames)) // line with passenger info
+    })
+
+    reader.on('close', () => resolve(passengersInfo))
+
+    reader.on('error', (err) => reject(err))
+  })
+}
+
+// here must be try-catch block but I don't care so far
 const passengers = await getPassengersList()
 
 const calculateTotalFares = (passengersInfo) => {
